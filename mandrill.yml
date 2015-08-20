@@ -1,0 +1,23 @@
+---
+ - name: Checking Mandrill logs for rejected emails
+   hosts: localhost
+   gather_facts: no
+   vars_files: 
+     - sendgrid.yml # this is a separate file with sendgrid credentials
+   tasks:
+     - name: Run ruby program to get rejected emails
+       shell: ruby /etc/ansible/playbooks/mandrill/mandrill_logs.rb | tee /home/ansible/mandrill.txt
+       register: mandrill_results
+     - name: Send email if rejected email found
+       mail: 
+         host="smtp.sendgrid.net"
+         port=25
+         to="email@tosendto.com"
+         subject="Mandrill Rejected Emails"
+         body="The attached file contains all Mandrill emails that were rejected in the past 7 days. It also includes the reason it was rejected (e.g. unsub) and other metadata."
+         username="{{ sg_user }}"
+         password="{{ sg_pass }}"
+         attach="/home/ansible/mandrill.txt"
+       when: mandrill_results.stdout.find('rejected') != -1
+     - name: Delete log file
+       shell: rm -rf /home/ansible/mandrill.txt
